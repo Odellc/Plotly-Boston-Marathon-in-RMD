@@ -1,0 +1,135 @@
+---
+title: "Boston Marathon Data in Plotly"
+author: "Christopher Odell"
+date: "June 6, 2018"
+output: html_document
+---
+
+```{r echo = FALSE, message = FALSE, warning = FALSE, print = FALSE, results ='hide'}
+library(tidyverse)
+library(ggplot2)
+library(gridExtra)
+library(magrittr)
+library(plyr)
+library(grid)
+library(dplyr)
+library(rsconnect)
+library(RColorBrewer)
+library(vcdExtra)
+library(GGally) # may need the package installed
+library(plotly) # may need the package installed
+library(crosstalk) # may need the package installed
+
+```
+
+
+
+```{r, echo = FALSE, print = FALSE, warning=FALSE, message=FALSE ,results='hide'}
+file_name <- "Boston Marathon - 2014.csv"
+url <- "https://raw.githubusercontent.com/llimllib/bostonmarathon/master/results/2014/results.csv"
+
+# only download if it isn't already here
+if(!file.exists(file_name)){
+  download.file(paste0(url, file_name), file_name, mode = "wb")
+}
+bos_14 <- read.csv("Boston Marathon - 2014.csv")
+head(bos_14)
+
+bos_14 <- plyr::rename( bos_14,c("X10k" ="Ten_k","X25k" ="Twenty_Five_k","X5k" ="Five_k","X20k" ="Twenty_k","X40k" ="Forty_k","X35k" ="Thirty_Five_k","X30k" = "Thirty_k"))
+
+# Fix column names
+cols.num <- c("Ten_k","Twenty_Five_k","Five_k","Twenty_k","Forty_k","Thirty_k","Thirty_Five_k","half")
+bos_14[cols.num] <- sapply(bos_14[cols.num],as.character)
+bos_14[cols.num] <- sapply(bos_14[cols.num],as.numeric)
+
+# Missing Values in these columns
+cols.char <- c("name","country","bib")
+bos_14[cols.char] <- sapply(bos_14[cols.char],as.character)
+
+# Some blank characters
+
+as.tibble(bos_14)
+
+bos3 <- bos_14%>% mutate(official = (official/60), half = (half/60), agegrp = cut(bos_14$age, c(0,20,25,30,35,40,45,50,55,60,65,100)), pacegroup = cut(bos_14$pace, c(0,5,6,7,8,9,10,11,25)), gender = ifelse(gender == "F", "Female", "Male")) %>% dplyr::filter(!grepl("W", bib))%>% arrange(gender)
+
+levels(bos3$pacegroup)[levels(bos3$pacegroup)=="(0,5]"] <- "4:01 to 5:00"
+levels(bos3$pacegroup)[levels(bos3$pacegroup)=="(5,6]"] <- "5:01 to 6:00"
+levels(bos3$pacegroup)[levels(bos3$pacegroup)=="(6,7]"] <- "6:01 to 7:00"
+levels(bos3$pacegroup)[levels(bos3$pacegroup)=="(7,8]"] <- "7:01 to 8:00"
+levels(bos3$pacegroup)[levels(bos3$pacegroup)=="(8,9]"] <- "8:01 to 9:00"
+levels(bos3$pacegroup)[levels(bos3$pacegroup)=="(9,10]"] <- "9:01 to 10:00"
+levels(bos3$pacegroup)[levels(bos3$pacegroup)=="(10,11]"] <- "10:01 to 11:00"
+levels(bos3$pacegroup)[levels(bos3$pacegroup)=="(11,25]"] <- "11:01 +"
+
+
+levels(bos3$agegrp)[levels(bos3$agegrp)=="(0,20]"] <- "under 20"
+levels(bos3$agegrp)[levels(bos3$agegrp)=="(20,25]"] <- "20-25"
+levels(bos3$agegrp)[levels(bos3$agegrp)=="(25,30]"] <- "25-30"
+levels(bos3$agegrp)[levels(bos3$agegrp)=="(30,35]"] <- "30-35"
+levels(bos3$agegrp)[levels(bos3$agegrp)=="(35,40]"] <- "35-40"
+levels(bos3$agegrp)[levels(bos3$agegrp)=="(40,45]"] <- "40-45"
+levels(bos3$agegrp)[levels(bos3$agegrp)=="(45,50]"] <- "45-50"
+levels(bos3$agegrp)[levels(bos3$agegrp)=="(50,55]"] <- "50-55"
+levels(bos3$agegrp)[levels(bos3$agegrp)=="(55,60]"] <- "55-60"
+levels(bos3$agegrp)[levels(bos3$agegrp)=="(60,65]"] <- "60-65"
+levels(bos3$agegrp)[levels(bos3$agegrp)=="(65,100]"] <- "over 65"
+
+
+set.seed(876)
+fbos <- bos3[sample(which(bos3$gender == 'Female'),replace = F,1000),]
+mbos <- bos3[sample(which(bos3$gender == 'Male'),replace = F,1000),]
+
+sample_bos <- as.tibble(rbind(fbos,mbos))
+
+```
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+
+sd <- SharedData$new(bos3, ~pacegroup, group = "<b>Choose Pace Group (Minute / Mile)<b>")
+
+t <- list(
+  family = "Times New Roman",
+  size = 12,
+  bold = TRUE,
+  color = 'black')
+
+base <- plot_ly(sd, color = ~gender,  colors=c("red","darkgrey") , height = 400, hoverinfo = "none" ) %>%
+  group_by(pacegroup)
+
+p1 <- base %>% add_histogram( y = ~agegrp,type = 'scatter', legendgroup = "1st",
+                              legendgroup = ~gender) %>%
+  layout(margin = list(l = 150, r = 2, b = 95, t = 70, pad = 3),
+    xaxis = list(title = ""),
+    yaxis = list(title = "<b>Age Groups<b>"))
+
+p3 <- base %>%
+  add_boxplot(x = ~ gender, y = ~official, alpha = 0.5, legendgroup = ~gender, showlegend = FALSE, name = c("Female", "Male")) %>%
+  layout(xaxis = list(title = ""),
+         yaxis = list(title = "<b>Official Time<b>",ticksuffix= " Hr"))
+
+
+subplot(p1, p3, margin = c(0.15 ,0, 0, 0), which_layout = 1, titleX = TRUE, titleY = TRUE)%>%
+  highlight( dynamic = FALSE, selectize = TRUE)%>%
+    layout(title = "<b>Pace Distribution by Gender from The 2014 Boston Marathon<b>",titlefont=list(size=22), 
+         showlegend=TRUE ,showlegend2=FALSE,
+         autosize = TRUE, font = t, annotations = list(
+ list(x = 0.2 , y = 1.10, text = "Number of Participants", showarrow = F, xref='paper', yref='paper'),
+  list(x = 1 , y = 1.10, text = "Finishing Times", showarrow = F, xref='paper', yref='paper'),
+ list(x =1.1, y = -0.4, text = "Data is from the 2014 Boston Marathon. We can see a shift in age by gender, and the spread of overall\n performance by pace groups. Select a pace group, and see the impact each group has on male and female performance.",
+      showarrow = F, xref='paper', yref='paper', 
+      xanchor='right', xshift=0, yshift=0,
+      font=list(size=12, color="black"))))
+
+
+
+```
+
+
+
+
+
+
+
+
+
