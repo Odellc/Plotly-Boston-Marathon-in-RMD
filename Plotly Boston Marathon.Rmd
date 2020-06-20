@@ -19,9 +19,9 @@ library(vcdExtra)
 library(GGally) # may need the package installed
 library(plotly) # may need the package installed
 library(crosstalk) # may need the package installed
+getwd()
 
 ```
-
 
 
 ```{r, echo = FALSE, print = FALSE, warning=FALSE, message=FALSE ,results='hide'}
@@ -124,9 +124,6 @@ subplot(p1, p3, margin = c(0.15 ,0, 0, 0), which_layout = 1, titleX = TRUE, titl
 
 
 ```
-
-
-
 
 
 
