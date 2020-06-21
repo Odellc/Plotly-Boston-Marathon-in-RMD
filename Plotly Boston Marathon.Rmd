@@ -127,6 +127,3 @@ subplot(p1, p3, margin = c(0.15 ,0, 0, 0), which_layout = 1, titleX = TRUE, titl
 
 
 
-
-
-
